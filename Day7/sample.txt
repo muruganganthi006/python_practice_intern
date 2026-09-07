@@ -1,0 +1,3 @@
+Python is easy to learn
+I am practicing Python every day
+Functions and files are important

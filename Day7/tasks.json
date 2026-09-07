@@ -1,0 +1,34 @@
+[
+    {
+        "task": "python learn",
+        "completed": false
+    },
+    {
+        "task": "no sql",
+        "completed": false
+    },
+    {
+        "task": "git",
+        "completed": false
+    },
+    {
+        "task": "git hub",
+        "completed": false
+    },
+    {
+        "task": "my sql",
+        "completed": false
+    },
+    {
+        "task": "html",
+        "completed": false
+    },
+    {
+        "task": "fast api",
+        "completed": false
+    },
+    {
+        "task": "postgre sql",
+        "completed": false
+    }
+]
