@@ -1,0 +1,36 @@
+{
+    "books": [
+        {
+            "book_id": 100101,
+            "title": "murugan",
+            "author": "chandhan",
+            "borrowed_by": 120021
+        },
+        {
+            "book_id": 100102,
+            "title": "python",
+            "author": "cc.john",
+            "borrowed_by": null
+        },
+        {
+            "book_id": 100103,
+            "title": "fast api",
+            "author": "kk.son",
+            "borrowed_by": null
+        }
+    ],
+    "members": [
+        {
+            "member_id": 120021,
+            "name": "murugan"
+        },
+        {
+            "member_id": 120022,
+            "name": "chandhan"
+        },
+        {
+            "member_id": 120023,
+            "name": "pradeep"
+        }
+    ]
+}
