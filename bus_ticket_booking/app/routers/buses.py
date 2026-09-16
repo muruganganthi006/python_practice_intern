@@ -21,10 +21,6 @@ def get_db():
         db.close()
 
 
-# -------------------------
-# Create Bus
-# -------------------------
-
 @router.post(
     "/",
     response_model=BusResponse,
@@ -60,10 +56,6 @@ def create_bus(
     return new_bus
 
 
-# -------------------------
-# Get All Buses
-# -------------------------
-
 @router.get(
     "/",
     response_model=list[BusResponse]
@@ -75,10 +67,6 @@ def get_buses(
 
     return buses
 
-
-# -------------------------
-# Get Bus by ID
-# -------------------------
 
 @router.get(
     "/{bus_id}",
@@ -100,11 +88,6 @@ def get_bus(
         )
 
     return bus
-
-
-# -------------------------
-# Update Bus
-# -------------------------
 
 @router.put(
     "/{bus_id}",
