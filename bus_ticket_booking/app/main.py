@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.database import engine, Base
 from app import models
 
-from app.routers import auth, buses, routes, trips
+from app.routers import auth, buses, routes, trips, bookings, payments, reviews
 
 
 Base.metadata.create_all(bind=engine)
@@ -16,7 +16,9 @@ app.include_router(auth.router)
 app.include_router(buses.router)
 app.include_router(routes.router)
 app.include_router(trips.router)
-
+app.include_router(bookings.router)
+app.include_router(payments.router)
+app.include_router(reviews.router)
 
 @app.get("/")
 def root():

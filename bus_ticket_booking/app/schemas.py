@@ -209,3 +209,56 @@ class TripResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TripUpdate(BaseModel):
+    departure_time: datetime
+    arrival_time: datetime
+    fare: float = Field(gt=0)
+    status: str = "scheduled"
+
+class BookingCreate(BaseModel):
+    trip_id: int
+    seat_numbers: list[int] = Field(min_length=1)
+
+
+class BookingResponse(BaseModel):
+    id: int
+    user_id: int
+    trip_id: int
+    seat_numbers: str
+    num_seats: int
+    total_amount: float
+    status: str
+    booked_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class PaymentRequest(BaseModel):
+    booking_id: int
+    payment_method: str = Field(min_length=3, max_length=30)
+
+
+class PaymentResponse(BaseModel):
+    booking_id: int
+    payment_method: str
+    amount: float
+    status: str
+    message: str
+
+class ReviewCreate(BaseModel):
+    trip_id: int
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
+
+class ReviewResponse(BaseModel):
+    id: int
+    user_id: int
+    trip_id: int
+    rating: int
+    comment: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
