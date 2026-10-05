@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, 'Segoe UI', sans-serif;
+  color: #172033;
+  background: #edf4ff;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(255, 144, 92, 0.22), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.18), transparent 24%),
+    linear-gradient(135deg, #edf6ff 0%, #f8fafc 35%, #fff7f3 100%);
+}
+
+::selection {
+  background: rgba(255, 107, 53, 0.22);
+  color: #0b1f3a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+input,
+button,
+select {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+.logo-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0b1f3a 0%, #183867 100%);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 14px 28px rgba(11, 31, 58, 0.22);
+}
+
+.logo-mark::before,
+.logo-mark::after {
+  content: '';
+  position: absolute;
+  border: 2px solid #ff6b35;
+  border-color: transparent transparent #ff6b35 #ff6b35;
+  width: 20px;
+  height: 20px;
+  transform: rotate(45deg);
+  right: 8px;
+  top: 9px;
+}
+
+.logo-mark::after {
+  width: 14px;
+  height: 14px;
+  border-color: transparent transparent #ffffff #ffffff;
+  right: 13px;
+  top: 14px;
+}
+
+.glass-panel {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
