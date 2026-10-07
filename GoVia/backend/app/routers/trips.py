@@ -5,13 +5,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
+from app.dependencies.auth import require_admin
 from app.models.booking import BookingSeat
 from app.models.bus import Bus
 from app.models.operator import BusOperator
 from app.models.routes import Route
 from app.models.trips import Trip
+from app.models.user import User
 from app.schemas.trips import TripCreate, TripResponse
 from app.schemas.trip_search import TripSearchResponse
+from app.services.seat_management import trip_seat_payload
 
 
 router = APIRouter(
@@ -31,8 +34,10 @@ def get_db():
 @router.post("/", response_model=TripResponse, status_code=201)
 def create_trip(
     payload: TripCreate,
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    del current_user
     bus = db.get(Bus, payload.bus_id)
 
     if bus is None:
@@ -93,6 +98,9 @@ def search_trips(
             Route.destination.ilike(destination.strip()),
             Trip.travel_date == travel_date,
             Trip.status == "SCHEDULED",
+            Route.status == "ACTIVE",
+            Bus.status == "ACTIVE",
+            BusOperator.status == "ACTIVE",
         )
         .order_by(Trip.departure_time)
     )
@@ -104,6 +112,12 @@ def search_trips(
             id=trip.id,
             bus_id=bus.id,
             route_id=route.id,
+            boarding_point_id=trip.boarding_point_id,
+            dropping_point_id=trip.dropping_point_id,
+            boarding_point=trip.boarding_point.name if trip.boarding_point else None,
+            dropping_point=trip.dropping_point.name if trip.dropping_point else None,
+            distance_km=route.distance_km,
+            estimated_duration_minutes=route.estimated_duration_minutes,
             origin=route.origin,
             destination=route.destination,
             travel_date=trip.travel_date,
@@ -139,21 +153,9 @@ def get_trip_seats(
             detail="Trip is not assigned to a bus.",
         )
 
-    booked_seats = db.scalars(
-        select(BookingSeat.seat_number)
-        .where(BookingSeat.trip_id == trip_id)
-        .order_by(BookingSeat.seat_number)
-    ).all()
-
-    total_seats = trip.bus.total_seats
-    available_seats = [seat for seat in range(1, total_seats + 1) if seat not in booked_seats]
-
-    return {
-        "trip_id": trip.id,
-        "total_seats": total_seats,
-        "booked_seats": booked_seats,
-        "available_seats": available_seats,
-    }
+    payload = trip_seat_payload(db, trip)
+    db.commit()
+    return payload
 
 
 @router.get("/{trip_id}", response_model=TripResponse)

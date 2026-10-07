@@ -54,8 +54,22 @@ class Bus(Base):
         back_populates="buses",
     )
 
+    operating_schedule = relationship(
+        "BusOperatingSchedule",
+        back_populates="bus",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
     trips = relationship(
         "Trip",
         back_populates="bus",
         cascade="all, delete-orphan",
+    )
+
+    seats = relationship(
+        "BusSeat",
+        back_populates="bus",
+        cascade="all, delete-orphan",
+        order_by="BusSeat.seat_number",
     )

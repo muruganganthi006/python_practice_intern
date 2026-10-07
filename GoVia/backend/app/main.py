@@ -5,6 +5,7 @@ from app.config import settings
 from app.database import check_database_connection, init_db
 from app.routers.buses import router as buses_router
 from app.routers.admin import router as admin_router
+from app.routers.admin_management import router as admin_management_router
 from app.routers.auth import router as auth_router
 from app.routers.bookings import router as bookings_router
 from app.routers.operators import router as operators_router
@@ -45,6 +46,7 @@ app.include_router(auth_router)
 app.include_router(travel_router)
 app.include_router(bookings_router)
 app.include_router(admin_router)
+app.include_router(admin_management_router)
 app.include_router(operators_router)
 app.include_router(buses_router)
 app.include_router(routes_router)

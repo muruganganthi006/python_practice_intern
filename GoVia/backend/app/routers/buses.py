@@ -3,8 +3,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
+from app.dependencies.auth import require_admin
 from app.models.bus import Bus
 from app.models.operator import BusOperator
+from app.models.user import User
 from app.schemas.buses import BusCreate, BusResponse
 
 
@@ -25,8 +27,10 @@ def get_db():
 @router.post("/", response_model=BusResponse, status_code=201)
 def create_bus(
     payload: BusCreate,
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    del current_user
     operator = db.get(BusOperator, payload.operator_id)
 
     if operator is None:

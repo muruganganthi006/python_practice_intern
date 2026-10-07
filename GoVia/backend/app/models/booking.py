@@ -83,6 +83,13 @@ class Booking(Base):
         cascade="all, delete-orphan",
     )
 
+    payment = relationship(
+        "Payment",
+        back_populates="booking",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
 
 class BookingSeat(Base):
     __tablename__ = "booking_seats"

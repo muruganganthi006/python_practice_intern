@@ -100,7 +100,13 @@ def search_trips(
         select(Trip, Bus, BusOperator)
         .join(Bus, Bus.id == Trip.bus_id)
         .join(BusOperator, BusOperator.id == Bus.operator_id)
-        .where(Trip.route_id == route.id)
+        .where(
+            Trip.route_id == route.id,
+            Trip.status == "SCHEDULED",
+            Route.status == "ACTIVE",
+            Bus.status == "ACTIVE",
+            BusOperator.status == "ACTIVE",
+        )
         .order_by(Trip.departure_time)
     ).all()
 

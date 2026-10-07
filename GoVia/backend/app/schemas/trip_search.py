@@ -7,6 +7,12 @@ class TripSearchResponse(BaseModel):
     id: int
     bus_id: int
     route_id: int
+    boarding_point_id: int | None = None
+    dropping_point_id: int | None = None
+    boarding_point: str | None = None
+    dropping_point: str | None = None
+    distance_km: int | None = None
+    estimated_duration_minutes: int | None = None
 
     origin: str
     destination: str

@@ -3,7 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
+from app.dependencies.auth import require_admin
 from app.models.routes import Route
+from app.models.user import User
 from app.schemas.routes import RouteCreate, RouteResponse
 
 
@@ -24,8 +26,10 @@ def get_db():
 @router.post("/", response_model=RouteResponse, status_code=201)
 def create_route(
     payload: RouteCreate,
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    del current_user
     existing_route = db.scalar(
         select(Route).where(
             Route.origin == payload.origin,

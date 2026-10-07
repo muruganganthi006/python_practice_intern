@@ -23,6 +23,19 @@ class Trip(Base):
         nullable=False,
     )
 
+    schedule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bus_operating_schedules.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    boarding_point_id: Mapped[int | None] = mapped_column(
+        ForeignKey("route_points.id"), nullable=True
+    )
+    dropping_point_id: Mapped[int | None] = mapped_column(
+        ForeignKey("route_points.id"), nullable=True
+    )
+
     travel_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
@@ -66,6 +79,14 @@ class Trip(Base):
         back_populates="trips",
     )
 
+    schedule = relationship(
+        "BusOperatingSchedule",
+        back_populates="trips",
+    )
+
+    boarding_point = relationship("RoutePoint", foreign_keys=[boarding_point_id])
+    dropping_point = relationship("RoutePoint", foreign_keys=[dropping_point_id])
+
     bookings = relationship(
         "Booking",
         back_populates="trip",
@@ -73,6 +94,11 @@ class Trip(Base):
     )
     booking_seats = relationship(
         "BookingSeat",
+        back_populates="trip",
+        cascade="all, delete-orphan",
+    )
+    seat_states = relationship(
+        "TripSeatState",
         back_populates="trip",
         cascade="all, delete-orphan",
     )

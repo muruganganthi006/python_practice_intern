@@ -48,6 +48,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RegisterPage } from './pages/RegisterPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
+import { AdminManagementSection } from './components/AdminManagementSections';
 
 const navItems = ['Home', 'Bus Tickets', 'My Bookings', 'Help'];
 
@@ -639,6 +640,15 @@ type SeatAvailability = {
   total_seats: number;
   booked_seats: number[];
   available_seats: number[];
+  seats: Array<{
+    seat_number: number;
+    seat_label: string;
+    seat_type: 'SEATER' | 'SLEEPER';
+    row_index: number;
+    column_index: number;
+    status: 'AVAILABLE' | 'BOOKED' | 'RESERVED' | 'BLOCKED';
+    booking: { booking_id: number; passenger: string } | null;
+  }>;
 };
 
 const fallbackSearchResults: SearchResult[] = [
@@ -1789,36 +1799,53 @@ function CheckoutPage() {
                     {seatMessage}
                   </div>
                 ) : (
-                  <div className="mt-5 grid grid-cols-4 gap-3 sm:grid-cols-6">
-                    {Array.from(
-                      { length: seatAvailability?.total_seats ?? 0 },
-                      (_, index) => index + 1,
-                    ).map((seat) => {
-                      const isBooked =
-                        seatAvailability?.booked_seats.includes(seat) ??
-                        false;
+                  <>
+                    <p className="mt-5 text-center text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Driver</p>
+                    <div className="mx-auto mt-3 grid max-w-lg grid-cols-5 gap-2">
+                      {seatAvailability?.seats.map((seat) => {
+                        const isSelected = selectedSeats.includes(seat.seat_number);
+                        const unavailable = seat.status !== 'AVAILABLE' && !isSelected;
+                        const isSleeper = seat.seat_type === 'SLEEPER';
 
-                      const isSelected = selectedSeats.includes(seat);
-
-                      return (
-                        <button
-                          key={seat}
-                          type="button"
-                          onClick={() => toggleSeat(seat)}
-                          disabled={isBooked}
-                          className={`flex h-12 items-center justify-center rounded-2xl text-sm font-semibold transition ${
-                            isBooked
-                              ? 'cursor-not-allowed bg-slate-200 text-slate-500 line-through'
-                              : isSelected
-                                ? 'bg-orange text-white shadow-[0_12px_24px_rgba(255,107,53,0.25)]'
-                                : 'border border-slate-200 bg-white text-slate-700 hover:border-orange/40 hover:text-orange'
-                          }`}
-                        >
-                          {seat}
-                        </button>
-                      );
-                    })}
-                  </div>
+                        return (
+                          <button
+                            key={seat.seat_number}
+                            type="button"
+                            aria-label={String(seat.seat_number)}
+                            title={`${seat.seat_label} · ${seat.status}${seat.booking ? ` · ${seat.booking.passenger}` : ''}`}
+                            onClick={() => toggleSeat(seat.seat_number)}
+                            disabled={unavailable}
+                            style={{
+                              gridColumnStart: isSleeper
+                                ? seat.column_index < 3 ? 1 : 4
+                                : seat.column_index + 1,
+                              gridRowStart: seat.row_index + 1,
+                            }}
+                            className={`${isSleeper ? 'col-span-2 min-h-[76px]' : 'min-h-12'} flex w-full flex-col items-center justify-center border-2 px-2 py-2 text-xs font-bold transition ${isSleeper ? 'rounded-xl' : 'rounded-t-xl'} ${
+                              unavailable
+                                ? seat.status === 'BOOKED'
+                                  ? 'cursor-not-allowed border-red-300 bg-red-100 text-red-800'
+                                  : seat.status === 'RESERVED'
+                                    ? 'cursor-not-allowed border-amber-300 bg-amber-100 text-amber-800'
+                                    : 'cursor-not-allowed border-slate-700 bg-slate-800 text-white'
+                                : isSelected
+                                  ? 'border-orange bg-orange text-white shadow-[0_12px_24px_rgba(255,107,53,0.25)]'
+                                  : 'border-emerald-400 bg-emerald-50 text-emerald-800 hover:border-orange/60'
+                            }`}
+                          >
+                            <span>{seat.seat_label}</span>
+                            <span className="text-[9px] font-semibold">{isSleeper ? 'SLEEPER' : 'SEATER'}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs font-semibold text-slate-600">
+                      <span className="text-emerald-700">Available</span>
+                      <span className="text-red-700">Booked</span>
+                      <span className="text-amber-700">Reserved</span>
+                      <span className="text-slate-700">Blocked</span>
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -1977,6 +2004,7 @@ function PaymentPage() {
           traveler_name: flow.travelerName,
           traveler_phone: flow.travelerPhone,
           traveler_email: flow.travelerEmail,
+          payment_method: paymentMethod,
         }),
       });
 
@@ -2070,6 +2098,10 @@ function PaymentPage() {
 
 type AdminTrip = {
   id: number;
+  route_id: number;
+  bus_id: number;
+  boarding_point_id?: number | null;
+  dropping_point_id?: number | null;
   route: string;
   operator: string;
   bus_number: string;
@@ -2079,6 +2111,38 @@ type AdminTrip = {
   fare: number;
   status: string;
   seats_left: number;
+};
+
+type AdminRouteOption = {
+  id: number;
+  origin: string;
+  destination: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  boarding_points: Array<{ id: number; name: string }>;
+  dropping_points: Array<{ id: number; name: string }>;
+};
+
+type AdminSummary = {
+  operators: number;
+  active_operators: number;
+  buses: number;
+  active_buses: number;
+  routes: number;
+  trips: number;
+  scheduled_trips: number;
+  completed_trips: number;
+  cancelled_trips: number;
+  users: number;
+  bookings: number;
+  cancelled_bookings: number;
+  revenue: number;
+  successful_payments: number;
+  failed_payments: number;
+  total_seats: number;
+  booked_seats: number;
+  seat_occupancy_percent: number;
+  upcoming_trips: Array<{ id: number; route: string; bus: string; travel_date: string; departure_time: string; status: string }>;
+  recent_payments: Array<{ id: number; booking_id: string; user: string; amount: number; method: string; transaction_id: string; status: string; payment_date: string }>;
 };
 
 type AdminBus = {
@@ -2095,19 +2159,31 @@ type AdminBus = {
 
 type AdminBooking = {
   id: string;
+  apiId: number;
   passenger: string;
   email: string;
+  phone: string;
   route: string;
+  routeId: number;
   bus: string;
+  busId: number;
   date: string;
   seats: string;
   amount: number;
   status: 'CONFIRMED' | 'CANCELLED' | 'PENDING';
+  paymentStatus: string;
+  paymentMethod: string;
 };
 
 type AdminSection =
   | 'dashboard'
+  | 'operators'
   | 'fleet'
+  | 'routes'
+  | 'seats'
+  | 'payments'
+  | 'profile'
+  | 'settings'
   | 'trips'
   | 'bookings'
   | 'cancellations'
@@ -2132,6 +2208,10 @@ function AdminDashboardPage() {
   const [buses, setBuses] = useState<AdminBus[]>([]);
   const [loadingBuses, setLoadingBuses] = useState(true);
 
+  const [routes, setRoutes] = useState<AdminRouteOption[]>([]);
+  const [summary, setSummary] = useState<AdminSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+
   const [operatorOptions, setOperatorOptions] = useState<Array<{ id: number; name: string }>>([]);
 
   const [showBusModal, setShowBusModal] = useState(false);
@@ -2139,6 +2219,10 @@ function AdminDashboardPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [bookingFilter, setBookingFilter] = useState('ALL');
+  const [paymentFilter, setPaymentFilter] = useState('ALL');
+  const [bookingDateFilter, setBookingDateFilter] = useState('');
+  const [bookingRouteFilter, setBookingRouteFilter] = useState('ALL');
+  const [bookingBusFilter, setBookingBusFilter] = useState('ALL');
 
   const [busForm, setBusForm] = useState({
     busNumber: '',
@@ -2206,12 +2290,43 @@ function AdminDashboardPage() {
   };
 
   const loadOperators = async () => {
+  try {
+    const payload = await apiClient.request<
+      Array<{
+        id: number;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+        created_at?: string;
+      }>
+    >('/api/operators/');
+
+    setOperatorOptions(payload);
+  } catch (error) {
+    console.error('Failed to load operators:', error);
+    setOperatorOptions([]);
+  }
+};
+
+  const loadRoutes = async () => {
     try {
-      const payload = await apiClient.request<Array<{ id: number; name: string }>>('/api/operators/');
-      setOperatorOptions(payload);
+      const payload = await apiClient.request<{ routes: AdminRouteOption[] }>('/api/admin/routes');
+      setRoutes(payload.routes.filter((route) => route.status === 'ACTIVE'));
     } catch (error) {
-      console.error('Failed to load operators:', error);
-      setOperatorOptions([]);
+      console.error('Failed to load routes:', error);
+      setRoutes([]);
+    }
+  };
+
+  const loadSummary = async () => {
+    setLoadingSummary(true);
+    try {
+      setSummary(await apiClient.request<AdminSummary>('/api/admin/dashboard/summary'));
+    } catch (error) {
+      console.error('Failed to load dashboard summary:', error);
+      setSummary(null);
+    } finally {
+      setLoadingSummary(false);
     }
   };
 
@@ -2222,27 +2337,39 @@ function AdminDashboardPage() {
       const payload = await apiClient.request<{
         bookings: Array<{
           id: number;
+          booking_id: string;
           user: string;
           email: string;
+          phone: string;
           route: string;
+          route_id: number;
           bus: string;
+          bus_id: number;
           date: string;
           seats: string;
           amount: number;
           status: string;
+          payment_status: string;
+          payment_method: string | null;
         }>;
       }>('/api/admin/bookings');
 
       const mappedBookings: AdminBooking[] = payload.bookings.map((booking) => ({
-        id: `GV-${String(booking.id).padStart(5, '0')}`,
+        id: booking.booking_id || `GV-${String(booking.id).padStart(5, '0')}`,
+        apiId: booking.id,
         passenger: booking.user,
         email: booking.email,
+        phone: booking.phone,
         route: booking.route,
+        routeId: booking.route_id,
         bus: booking.bus,
+        busId: booking.bus_id,
         date: booking.date,
         seats: booking.seats,
         amount: Number(booking.amount ?? 0),
         status: (booking.status as AdminBooking['status']) || 'CONFIRMED',
+        paymentStatus: booking.payment_status || 'UNKNOWN',
+        paymentMethod: booking.payment_method || '—',
       }));
 
       setAdminBookings(mappedBookings);
@@ -2258,16 +2385,12 @@ function AdminDashboardPage() {
     void loadTrips();
     void loadBuses();
     void loadOperators();
+    void loadRoutes();
     void loadBookings();
+    void loadSummary();
   }, []);
 
-  const totalRevenue = useMemo(
-    () =>
-      adminBookings
-        .filter((booking) => booking.status === 'CONFIRMED')
-        .reduce((sum, booking) => sum + booking.amount, 0),
-    [],
-  );
+  const totalRevenue = summary?.revenue ?? 0;
 
   const confirmedBookings = adminBookings.filter(
     (booking) => booking.status === 'CONFIRMED',
@@ -2277,23 +2400,16 @@ function AdminDashboardPage() {
     (booking) => booking.status === 'CANCELLED',
   ).length;
 
-  const availableSeats = trips.reduce(
-    (sum, trip) => sum + trip.seats_left,
-    0,
-  );
-
-  const totalSeats = buses.reduce((sum, bus) => sum + bus.seats, 0);
-
-  const occupancy =
-    totalSeats > 0
-      ? Math.round(
-          ((totalSeats - availableSeats) / totalSeats) * 100,
-        )
-      : 18;
+  const availableSeats = Math.max(0, (summary?.total_seats ?? 0) - (summary?.booked_seats ?? 0));
+  const occupancy = summary?.seat_occupancy_percent ?? 0;
 
   const filteredBookings = adminBookings.filter((booking) => {
     const matchesFilter =
       bookingFilter === 'ALL' || booking.status === bookingFilter;
+    const matchesPayment = paymentFilter === 'ALL' || booking.paymentStatus === paymentFilter;
+    const matchesDate = !bookingDateFilter || booking.date === bookingDateFilter;
+    const matchesRoute = bookingRouteFilter === 'ALL' || String(booking.routeId) === bookingRouteFilter;
+    const matchesBus = bookingBusFilter === 'ALL' || String(booking.busId) === bookingBusFilter;
 
     const search = searchTerm.toLowerCase();
     const matchesSearch =
@@ -2302,14 +2418,24 @@ function AdminDashboardPage() {
       booking.route.toLowerCase().includes(search) ||
       booking.email.toLowerCase().includes(search);
 
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesPayment && matchesDate && matchesRoute && matchesBus && matchesSearch;
   });
+
+  const cancelAdminBooking = async (booking: AdminBooking) => {
+    if (!window.confirm(`Cancel booking ${booking.id}?`)) return;
+    try {
+      await apiClient.request(`/api/admin/bookings/${booking.apiId}/cancel`, { method: 'PATCH' });
+      await Promise.all([loadBookings(), loadSummary()]);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to cancel booking.');
+    }
+  };
 
   const openAddBus = () => {
     setEditingBus(null);
     setBusForm({
       busNumber: '',
-      operator: 'Skyline Travels',
+      operator: operatorOptions[0]?.name ?? '',
       busType: 'AC Seater',
       seats: '24',
       registration: '',
@@ -2400,14 +2526,29 @@ function AdminDashboardPage() {
       title: 'OPERATIONS',
       items: [
         {
+          id: 'operators' as AdminSection,
+          label: 'Operators',
+          icon: Users,
+        },
+        {
           id: 'fleet' as AdminSection,
           label: 'Fleet Management',
           icon: BusFront,
         },
         {
+          id: 'routes' as AdminSection,
+          label: 'Routes',
+          icon: MapPinned,
+        },
+        {
           id: 'trips' as AdminSection,
           label: 'Trips',
           icon: CalendarDays,
+        },
+        {
+          id: 'seats' as AdminSection,
+          label: 'Seat Management',
+          icon: BusFront,
         },
         {
           id: 'bookings' as AdminSection,
@@ -2424,6 +2565,11 @@ function AdminDashboardPage() {
     {
       title: 'BUSINESS',
       items: [
+        {
+          id: 'payments' as AdminSection,
+          label: 'Payments',
+          icon: CreditCard,
+        },
         {
           id: 'revenue' as AdminSection,
           label: 'Revenue',
@@ -2442,8 +2588,18 @@ function AdminDashboardPage() {
       ],
     },
     {
-      title: 'SECURITY',
+      title: 'ACCOUNT',
       items: [
+        {
+          id: 'profile' as AdminSection,
+          label: 'Admin Profile',
+          icon: UserCog,
+        },
+        {
+          id: 'settings' as AdminSection,
+          label: 'System Settings',
+          icon: Settings,
+        },
         {
           id: 'security' as AdminSection,
           label: 'Security',
@@ -2455,7 +2611,13 @@ function AdminDashboardPage() {
 
   const sectionTitle: Record<AdminSection, string> = {
     dashboard: 'Operations Dashboard',
+    operators: 'Operator Management',
     fleet: 'Fleet Management',
+    routes: 'Route Management',
+    seats: 'Seat Management',
+    payments: 'Payment Management',
+    profile: 'Admin Profile',
+    settings: 'System Settings',
     trips: 'Trip Management',
     bookings: 'Booking & Tickets',
     cancellations: 'Cancellations & Refunds',
@@ -2653,23 +2815,23 @@ function AdminDashboardPage() {
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                   <AdminStatCard
                     label="TOTAL BUSES"
-                    value={String(buses.length)}
-                    description={`${buses.filter((bus) => bus.status === 'ACTIVE').length} active fleet`}
+                    value={String(summary?.buses ?? 0)}
+                    description={`${summary?.active_buses ?? 0} active fleet`}
                     icon={<BusFront size={21} />}
                     iconClass="bg-blue-50 text-blue-600"
                   />
 
                   <AdminStatCard
                     label="TOTAL TRIPS"
-                    value={String(trips.length || 5)}
-                    description="Scheduled trips"
+                    value={String(summary?.trips ?? 0)}
+                    description={`${summary?.scheduled_trips ?? 0} scheduled trips`}
                     icon={<CalendarDays size={21} />}
                     iconClass="bg-violet-50 text-violet-600"
                   />
 
                   <AdminStatCard
                     label="TOTAL BOOKINGS"
-                    value={String(adminBookings.length)}
+                    value={String(summary?.bookings ?? 0)}
                     description={`${confirmedBookings} confirmed`}
                     icon={<Ticket size={21} />}
                     iconClass="bg-orange-50 text-[#ff6736]"
@@ -2684,23 +2846,33 @@ function AdminDashboardPage() {
                   />
                 </div>
 
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <AdminStatCard label="OPERATORS" value={String(summary?.operators ?? 0)} description={`${summary?.active_operators ?? 0} active`} icon={<Users size={20} />} iconClass="bg-cyan-50 text-cyan-700" />
+                  <AdminStatCard label="ROUTES" value={String(summary?.routes ?? 0)} description="Configured routes" icon={<MapPinned size={20} />} iconClass="bg-sky-50 text-sky-700" />
+                  <AdminStatCard label="USERS" value={String(summary?.users ?? 0)} description="Registered accounts" icon={<UserCog size={20} />} iconClass="bg-indigo-50 text-indigo-700" />
+                  <AdminStatCard label="COMPLETED TRIPS" value={String(summary?.completed_trips ?? 0)} description={`${summary?.cancelled_trips ?? 0} cancelled`} icon={<CheckCircle2 size={20} />} iconClass="bg-emerald-50 text-emerald-700" />
+                  <AdminStatCard label="CANCELLED BOOKINGS" value={String(summary?.cancelled_bookings ?? 0)} description="Released reservations" icon={<RotateCcw size={20} />} iconClass="bg-red-50 text-red-600" />
+                  <AdminStatCard label="SUCCESSFUL PAYMENTS" value={String(summary?.successful_payments ?? 0)} description="Simulated transactions" icon={<CreditCard size={20} />} iconClass="bg-lime-50 text-lime-700" />
+                  <AdminStatCard label="FAILED PAYMENTS" value={String(summary?.failed_payments ?? 0)} description="Recorded failures" icon={<CreditCard size={20} />} iconClass="bg-amber-50 text-amber-700" />
+                </div>
+
                 <div className="mt-5 grid gap-5 md:grid-cols-3">
                   <MiniMetric
                     icon={<Users size={20} />}
                     label="Available seats"
-                    value={String(availableSeats || 98)}
+                    value={String(availableSeats)}
                   />
 
                   <MiniMetric
                     icon={<TrendingUp size={20} />}
                     label="Occupancy"
-                    value={`${occupancy || 18}%`}
+                    value={`${occupancy}%`}
                   />
 
                   <MiniMetric
                     icon={<RotateCcw size={20} />}
                     label="Cancelled"
-                    value={String(cancelledBookings)}
+                    value={String(summary?.cancelled_bookings ?? 0)}
                   />
                 </div>
 
@@ -2833,20 +3005,13 @@ function AdminDashboardPage() {
                     </div>
 
                     <div className="mt-10 space-y-6">
-                      <RevenueBar
-                        route="Chennai → Bangalore"
-                        percentage={48}
-                      />
-
-                      <RevenueBar
-                        route="Chennai → Coimbatore"
-                        percentage={29}
-                      />
-
-                      <RevenueBar
-                        route="Bangalore → Chennai"
-                        percentage={23}
-                      />
+                      {summary?.recent_payments.slice(0, 3).map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between border-b border-white/10 pb-3 text-sm">
+                          <span className="text-slate-200">{payment.booking_id} · {payment.user}</span>
+                          <span className="font-bold">₹{payment.amount.toLocaleString('en-IN')}</span>
+                        </div>
+                      ))}
+                      {!summary?.recent_payments.length ? <p className="text-sm text-slate-300">No payment transactions yet.</p> : null}
                     </div>
 
                     <button
@@ -2858,6 +3023,11 @@ function AdminDashboardPage() {
                       <ArrowRight size={16} />
                     </button>
                   </div>
+                </div>
+
+                <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-black text-[#102746]">Recent Payments</h3>
+                  {summary?.recent_payments.length ? <div className="mt-4 overflow-x-auto"><table className="min-w-[700px] w-full text-left text-sm"><thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500"><tr>{['BOOKING', 'USER', 'METHOD', 'TRANSACTION', 'AMOUNT', 'STATUS'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{summary.recent_payments.map((payment) => <tr key={payment.id}><td className="px-4 py-3 font-bold">{payment.booking_id}</td><td className="px-4 py-3">{payment.user}</td><td className="px-4 py-3">{payment.method}</td><td className="px-4 py-3 font-mono text-xs">{payment.transaction_id}</td><td className="px-4 py-3 font-bold">₹{payment.amount.toLocaleString('en-IN')}</td><td className="px-4 py-3">{payment.status}</td></tr>)}</tbody></table></div> : <p className="mt-3 text-sm text-slate-500">No payment transactions yet.</p>}
                 </div>
 
                 {/* RECENT BOOKINGS */}
@@ -2916,6 +3086,30 @@ function AdminDashboardPage() {
               </>
             )}
 
+            {activeSection === 'operators' && (
+              <AdminManagementSection section="operators" />
+            )}
+
+            {activeSection === 'routes' && (
+              <AdminManagementSection section="routes" />
+            )}
+
+            {activeSection === 'seats' && (
+              <AdminManagementSection section="seats" />
+            )}
+
+            {activeSection === 'payments' && (
+              <AdminManagementSection section="payments" />
+            )}
+
+            {activeSection === 'profile' && (
+              <AdminManagementSection section="profile" />
+            )}
+
+            {activeSection === 'settings' && (
+              <AdminManagementSection section="settings" />
+            )}
+
             {/* FLEET */}
             {activeSection === 'fleet' && (
               <AdminFleetSection
@@ -2928,20 +3122,43 @@ function AdminDashboardPage() {
 
             {/* TRIPS */}
             {activeSection === 'trips' && (
-              <AdminTripsSection trips={trips} loading={loadingTrips} />
+              <AdminTripsSection
+                trips={trips}
+                buses={buses.filter((bus) => bus.status === 'ACTIVE')}
+                routes={routes}
+                loading={loadingTrips}
+                onRefresh={loadTrips}
+              />
             )}
 
             {/* BOOKINGS */}
-            {activeSection === 'bookings' && (
-              <AdminBookingsSection
-                bookings={filteredBookings}
-                loading={loadingBookings}
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-                bookingFilter={bookingFilter}
-                setBookingFilter={setBookingFilter}
-              />
-            )}
+{activeSection === 'bookings' && (
+  <AdminBookingsSection
+    bookings={filteredBookings}
+    loading={loadingBookings}
+    searchTerm={searchTerm}
+    setSearchTerm={setSearchTerm}
+    bookingFilter={bookingFilter}
+    setBookingFilter={setBookingFilter}
+    paymentFilter={paymentFilter}
+    setPaymentFilter={setPaymentFilter}
+    travelDate={bookingDateFilter}
+    setTravelDate={setBookingDateFilter}
+    routeFilter={bookingRouteFilter}
+    setRouteFilter={setBookingRouteFilter}
+    busFilter={bookingBusFilter}
+    setBusFilter={setBookingBusFilter}
+    routes={routes.map((route) => ({
+      id: route.id,
+      label: `${route.origin} → ${route.destination}`,
+    }))}
+    buses={buses.map((bus) => ({
+      id: bus.id,
+      label: `${bus.busNumber} — ${bus.operator}`,
+    }))}
+    onCancel={cancelAdminBooking}
+  />
+)}
 
             {/* CANCELLATIONS */}
             {activeSection === 'cancellations' && (
@@ -2961,13 +3178,16 @@ function AdminDashboardPage() {
             )}
 
             {/* USERS */}
-            {activeSection === 'users' && <AdminUsersSection />}
+            {activeSection === 'users' && (
+              <AdminManagementSection section="users" />
+            )}
 
             {/* REPORTS */}
             {activeSection === 'reports' && (
               <AdminReportsSection
-                occupancy={occupancy || 18}
+                occupancy={occupancy}
                 totalRevenue={totalRevenue}
+                summary={summary}
               />
             )}
 
@@ -3037,7 +3257,7 @@ function AdminDashboardPage() {
                     operator: value,
                   }))
                 }
-                options={operators}
+                options={operatorOptions.map((operator) => operator.name)}
               />
 
               <AdminSelect
@@ -3049,13 +3269,16 @@ function AdminDashboardPage() {
                     busType: value,
                   }))
                 }
-                options={[
+                options={Array.from(new Set([
+                  'Seater',
+                  'Sleeper',
+                  'Semi-Sleeper',
                   'AC Seater',
                   'AC Sleeper',
-                  'Volvo AC',
-                  'Non AC',
-                  'Semi Sleeper',
-                ]}
+                  'Non-AC Seater',
+                  'Non-AC Sleeper',
+                  busForm.busType,
+                ]))}
               />
 
               <AdminInput
@@ -3370,11 +3593,103 @@ function AdminFleetSection({
 
 function AdminTripsSection({
   trips,
+  buses,
+  routes,
   loading,
+  onRefresh,
 }: {
   trips: AdminTrip[];
+  buses: AdminBus[];
+  routes: AdminRouteOption[];
   loading: boolean;
+  onRefresh: () => Promise<void>;
 }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<AdminTrip | null>(null);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    busId: '',
+    routeId: '',
+    date: new Date().toISOString().slice(0, 10),
+    departure: '06:30',
+    arrival: '13:10',
+    fare: '699',
+    status: 'SCHEDULED',
+    boardingPointId: '',
+    droppingPointId: '',
+  });
+
+  const openForm = (trip?: AdminTrip) => {
+    setEditingTrip(trip ?? null);
+    setForm(trip ? {
+      busId: String(trip.bus_id),
+      routeId: String(trip.route_id),
+      date: trip.date,
+      departure: trip.departure.slice(0, 5),
+      arrival: trip.arrival.slice(0, 5),
+      fare: String(trip.fare),
+      status: trip.status,
+      boardingPointId: trip.boarding_point_id ? String(trip.boarding_point_id) : '',
+      droppingPointId: trip.dropping_point_id ? String(trip.dropping_point_id) : '',
+    } : {
+      busId: buses[0] ? String(buses[0].id) : '',
+      routeId: routes[0] ? String(routes[0].id) : '',
+      date: new Date().toISOString().slice(0, 10),
+      departure: '06:30',
+      arrival: '13:10',
+      fare: '699',
+      status: 'SCHEDULED',
+      boardingPointId: '',
+      droppingPointId: '',
+    });
+    setError('');
+    setShowForm(true);
+  };
+
+  const selectedRoute = routes.find((route) => String(route.id) === form.routeId);
+
+  const saveTrip = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    const payload = {
+      bus_id: Number(form.busId),
+      route_id: Number(form.routeId),
+      travel_date: form.date,
+      departure_time: form.departure,
+      arrival_time: form.arrival,
+      fare: Number(form.fare),
+      status: form.status,
+      boarding_point_id: form.boardingPointId ? Number(form.boardingPointId) : null,
+      dropping_point_id: form.droppingPointId ? Number(form.droppingPointId) : null,
+    };
+    try {
+      await apiClient.request(editingTrip ? `/api/admin/trips/${editingTrip.id}` : '/api/admin/trips', {
+        method: editingTrip ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      setShowForm(false);
+      setEditingTrip(null);
+      await onRefresh();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save trip.');
+    }
+  };
+
+  const changeStatus = async (trip: AdminTrip, status: 'CANCELLED' | 'COMPLETED') => {
+    setError('');
+    try {
+      await apiClient.request(`/api/admin/trips/${trip.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      await onRefresh();
+    } catch (statusError) {
+      setError(statusError instanceof Error ? statusError.message : 'Unable to update trip status.');
+    }
+  };
+
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff6736]">
@@ -3386,8 +3701,27 @@ function AdminTripsSection({
       </h2>
 
       <p className="mt-2 text-sm text-slate-500">
-        Manage every scheduled trip, route timing and bus assignment.
+        Schedule buses on active routes and manage trip status.
       </p>
+
+      <div className="mt-5 flex justify-end">
+        <button type="button" onClick={() => openForm()} disabled={!buses.length || !routes.length} className="rounded-xl bg-[#ff6736] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Create Trip</button>
+      </div>
+
+      {error ? <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+
+      {showForm ? <form onSubmit={saveTrip} className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2 xl:grid-cols-3">
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Bus<select required value={form.busId} onChange={(event) => setForm({ ...form, busId: event.target.value })} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800">{buses.map((bus) => <option key={bus.id} value={bus.id}>{bus.busNumber} · {bus.operator}</option>)}</select></label>
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Route<select required value={form.routeId} onChange={(event) => setForm({ ...form, routeId: event.target.value, boardingPointId: '', droppingPointId: '' })} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800">{routes.map((route) => <option key={route.id} value={route.id}>{route.origin} → {route.destination}</option>)}</select></label>
+        <AdminInput label="Travel date" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} />
+        <AdminInput label="Departure time" type="time" value={form.departure} onChange={(departure) => setForm({ ...form, departure })} />
+        <AdminInput label="Arrival time" type="time" value={form.arrival} onChange={(arrival) => setForm({ ...form, arrival })} />
+        <AdminInput label="Ticket price" type="number" value={form.fare} onChange={(fare) => setForm({ ...form, fare })} />
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Boarding point<select value={form.boardingPointId} onChange={(event) => setForm({ ...form, boardingPointId: event.target.value })} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800"><option value="">No point selected</option>{selectedRoute?.boarding_points.map((point) => <option key={point.id} value={point.id}>{point.name}</option>)}</select></label>
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Dropping point<select value={form.droppingPointId} onChange={(event) => setForm({ ...form, droppingPointId: event.target.value })} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800"><option value="">No point selected</option>{selectedRoute?.dropping_points.map((point) => <option key={point.id} value={point.id}>{point.name}</option>)}</select></label>
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm normal-case tracking-normal text-slate-800"><option>SCHEDULED</option><option>CANCELLED</option><option>COMPLETED</option></select></label>
+        <div className="flex items-end justify-end gap-2 xl:col-span-3"><button type="button" onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel</button><button className="rounded-xl bg-[#102f52] px-4 py-2.5 text-sm font-bold text-white">{editingTrip ? 'Save Trip' : 'Create Trip'}</button></div>
+      </form> : null}
 
       <div className="mt-7 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mt-6 overflow-x-auto">
@@ -3413,6 +3747,7 @@ function AdminTripsSection({
                     'FARE',
                     'SEATS',
                     'STATUS',
+                    'ACTIONS',
                   ].map((heading) => (
                     <th
                       key={heading}
@@ -3462,6 +3797,12 @@ function AdminTripsSection({
                     <td className="px-4 py-4">
                       <StatusBadge status={trip.status} />
                     </td>
+                    <td className="px-4 py-4">
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => openForm(trip)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold">Edit</button>
+                        {trip.status === 'SCHEDULED' ? <><button type="button" onClick={() => void changeStatus(trip, 'CANCELLED')} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-bold text-red-700">Cancel</button><button type="button" onClick={() => void changeStatus(trip, 'COMPLETED')} className="rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-bold text-emerald-700">Complete</button></> : null}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -3480,6 +3821,17 @@ function AdminBookingsSection({
   setSearchTerm,
   bookingFilter,
   setBookingFilter,
+  paymentFilter,
+  setPaymentFilter,
+  travelDate,
+  setTravelDate,
+  routeFilter,
+  setRouteFilter,
+  busFilter,
+  setBusFilter,
+  routes,
+  buses,
+  onCancel,
 }: {
   bookings: AdminBooking[];
   loading: boolean;
@@ -3487,6 +3839,17 @@ function AdminBookingsSection({
   setSearchTerm: (value: string) => void;
   bookingFilter: string;
   setBookingFilter: (value: string) => void;
+  paymentFilter: string;
+  setPaymentFilter: (value: string) => void;
+  travelDate: string;
+  setTravelDate: (value: string) => void;
+  routeFilter: string;
+  setRouteFilter: (value: string) => void;
+  busFilter: string;
+  setBusFilter: (value: string) => void;
+  routes: Array<{ id: number; label: string }>;
+  buses: Array<{ id: number; label: string }>;
+  onCancel: (booking: AdminBooking) => void;
 }) {
   return (
     <div>
@@ -3503,7 +3866,7 @@ function AdminBookingsSection({
       </p>
 
       <div className="mt-7 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <div className="flex flex-1 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
             <Search size={18} className="text-slate-400" />
 
@@ -3525,6 +3888,10 @@ function AdminBookingsSection({
             <option value="PENDING">Pending</option>
             <option value="CANCELLED">Cancelled</option>
           </select>
+          <input aria-label="Filter booking date" type="date" value={travelDate} onChange={(event) => setTravelDate(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm" />
+          <select aria-label="Filter booking route" value={routeFilter} onChange={(event) => setRouteFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="ALL">All routes</option>{routes.map((route) => <option key={route.id} value={route.id}>{route.label}</option>)}</select>
+          <select aria-label="Filter booking bus" value={busFilter} onChange={(event) => setBusFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="ALL">All buses</option>{buses.map((bus) => <option key={bus.id} value={bus.id}>{bus.label}</option>)}</select>
+          <select aria-label="Filter payment status" value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"><option value="ALL">All payment statuses</option><option value="SUCCESS">Success</option><option value="FAILED">Failed</option><option value="REFUNDED">Refunded</option></select>
         </div>
 
         <div className="mt-6 overflow-x-auto">
@@ -3545,6 +3912,8 @@ function AdminBookingsSection({
                     'SEATS',
                     'AMOUNT',
                     'STATUS',
+                    'PAYMENT',
+                    'ACTION',
                   ].map((heading) => (
                     <th
                       key={heading}
@@ -3595,6 +3964,12 @@ function AdminBookingsSection({
 
                     <td className="px-4 py-4">
                       <StatusBadge status={booking.status} />
+                    </td>
+                    <td className="px-4 py-4 text-xs text-slate-600">
+                      {booking.paymentStatus}<br />{booking.paymentMethod}
+                    </td>
+                    <td className="px-4 py-4">
+                      {booking.status === 'CONFIRMED' ? <button type="button" onClick={() => onCancel(booking)} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">Cancel</button> : '—'}
                     </td>
                   </tr>
                 ))}
@@ -3949,10 +4324,42 @@ function AdminUsersSection() {
 function AdminReportsSection({
   occupancy,
   totalRevenue,
+  summary,
 }: {
   occupancy: number;
   totalRevenue: number;
+  summary: AdminSummary | null;
 }) {
+  const [error, setError] = useState('');
+  const reports = [
+    ['Daily Booking Report', 'daily-bookings'],
+    ['Monthly Revenue Report', 'monthly-revenue'],
+    ['Fleet Occupancy Report', 'fleet-occupancy'],
+    ['Cancellation Report', 'cancellations'],
+  ] as const;
+
+  const downloadReport = async (reportName: string) => {
+    setError('');
+    try {
+      const headers = new Headers();
+      const token = localStorage.getItem('govia_access_token');
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const response = await fetch(`${apiClient.baseUrl}/api/admin/reports/${reportName}`, {
+        headers,
+      });
+      if (!response.ok) throw new Error('Unable to generate report.');
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `govia-${reportName}.csv`;
+      link.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : 'Unable to generate report.');
+    }
+  };
+
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff6736]">
@@ -3986,10 +4393,18 @@ function AdminReportsSection({
 
         <AdminStatCard
           label="TRIPS"
-          value="5"
-          description="Scheduled trips"
+          value={String(summary?.trips ?? 0)}
+          description={`${summary?.scheduled_trips ?? 0} scheduled`}
           icon={<CalendarDays size={21} />}
           iconClass="bg-blue-50 text-blue-600"
+        />
+
+        <AdminStatCard
+          label="PAYMENTS"
+          value={String(summary?.successful_payments ?? 0)}
+          description="Successful simulated payments"
+          icon={<CreditCard size={21} />}
+          iconClass="bg-lime-50 text-lime-700"
         />
       </div>
 
@@ -3998,27 +4413,10 @@ function AdminReportsSection({
           <h3 className="text-lg font-black text-[#102746]">
             Occupancy Analytics
           </h3>
-
-          <div className="mt-8 flex items-end gap-4">
-            {[42, 55, 38, 68, 82, 64, occupancy].map((value, index) => (
-              <div
-                key={`${value}-${index}`}
-                className="flex flex-1 flex-col items-center gap-2"
-              >
-                <div className="flex h-48 w-full items-end rounded-xl bg-slate-50">
-                  <div
-                    className="w-full rounded-xl bg-[#ff6736]"
-                    style={{
-                      height: `${Math.max(value, 8)}%`,
-                    }}
-                  />
-                </div>
-
-                <span className="text-xs text-slate-400">
-                  D{index + 1}
-                </span>
-              </div>
-            ))}
+          <p className="mt-6 text-4xl font-black text-[#102746]">{occupancy}%</p>
+          <p className="mt-1 text-sm text-slate-500">{summary?.booked_seats ?? 0} booked of {summary?.total_seats ?? 0} seats across upcoming scheduled trips</p>
+          <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-[#ff6736]" style={{ width: `${Math.min(Math.max(occupancy, 0), 100)}%` }} />
           </div>
         </div>
 
@@ -4026,26 +4424,20 @@ function AdminReportsSection({
           <h3 className="text-lg font-black text-[#102746]">
             Report Downloads
           </h3>
+          {error ? <p role="alert" className="mt-3 text-sm text-red-700">{error}</p> : null}
 
           <div className="mt-5 space-y-3">
-            {[
-              'Daily Booking Report',
-              'Monthly Revenue Report',
-              'Fleet Occupancy Report',
-              'Cancellation Report',
-            ].map((report) => (
+            {reports.map(([label, reportName]) => (
               <button
-                key={report}
+                key={reportName}
                 type="button"
-                onClick={() =>
-                  window.alert(`${report} generation started.`)
-                }
+                onClick={() => void downloadReport(reportName)}
                 className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:bg-white hover:shadow-sm"
               >
                 <div className="flex items-center gap-3">
                   <BarChart3 size={18} className="text-[#ff6736]" />
                   <span className="text-sm font-semibold text-[#102746]">
-                    {report}
+                    {label}
                   </span>
                 </div>
 

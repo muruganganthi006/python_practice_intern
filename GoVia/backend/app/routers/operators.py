@@ -3,7 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
+from app.dependencies.auth import require_admin
 from app.models.operator import BusOperator
+from app.models.user import User
 from app.schemas.operators import OperatorCreate, OperatorResponse
 
 
@@ -24,8 +26,10 @@ def get_db():
 @router.post("/", response_model=OperatorResponse, status_code=201)
 def create_operator(
     payload: OperatorCreate,
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    del current_user
     existing_operator = db.scalar(
         select(BusOperator).where(
             BusOperator.name == payload.name

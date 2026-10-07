@@ -28,8 +28,18 @@ class Route(Base):
         nullable=True,
     )
 
+    estimated_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")
+
     trips = relationship(
         "Trip",
         back_populates="route",
         cascade="all, delete-orphan",
+    )
+
+    points = relationship(
+        "RoutePoint",
+        back_populates="route",
+        cascade="all, delete-orphan",
+        order_by="RoutePoint.id",
     )

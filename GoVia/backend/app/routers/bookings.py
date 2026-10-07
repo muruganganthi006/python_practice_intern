@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,9 +15,11 @@ from app.dependencies.auth import get_current_user
 from app.models.booking import Booking, BookingSeat
 from app.models.bus import Bus
 from app.models.operator import BusOperator
+from app.models.payment import Payment
 from app.models.routes import Route
 from app.models.trips import Trip
 from app.models.user import User
+from app.services.seat_management import trip_seat_payload
 
 router = APIRouter(prefix="/api", tags=["bookings"])
 
@@ -29,6 +33,7 @@ class BookingCreateRequest(BaseModel):
     traveler_name: str
     traveler_phone: str
     traveler_email: str
+    payment_method: Literal["UPI", "CARD", "NET_BANKING", "CASH"] = "UPI"
 
 
 def get_db():
@@ -65,7 +70,22 @@ def serialize_booking(booking: Booking) -> dict:
         "seats": sorted(seat.seat_number for seat in booking.seats),
         "passenger_count": booking.passenger_count,
         "status": booking.status,
-        "payment_status": "PAID" if booking.status.upper() in {"CONFIRMED", "CANCELLED"} else "PENDING",
+        "payment_status": (
+            "PAID"
+            if booking.payment and booking.payment.payment_status == "SUCCESS"
+            else booking.payment.payment_status
+            if booking.payment
+            else "PAID"
+            if booking.status.upper() in {"CONFIRMED", "CANCELLED"}
+            else "PENDING"
+        ),
+        "payment": {
+            "transaction_id": booking.payment.transaction_id,
+            "amount": float(booking.payment.amount),
+            "payment_method": booking.payment.payment_method,
+            "payment_status": booking.payment.payment_status,
+            "payment_date": booking.payment.payment_date.isoformat(),
+        } if booking.payment else None,
         "amount": float(booking.total_amount),
         "created_at": booking.created_at.isoformat(),
     }
@@ -83,6 +103,14 @@ def create_booking(payload: BookingCreateRequest, current_user: User = Depends(g
     bus = trip.bus
     if bus is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Trip is not linked to a valid bus.")
+    if (
+        bus.status != "ACTIVE"
+        or bus.operator is None
+        or bus.operator.status != "ACTIVE"
+        or trip.route is None
+        or trip.route.status != "ACTIVE"
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This trip is no longer available.")
 
     selected_seats = payload.selected_seats or []
     if selected_seats:
@@ -103,6 +131,15 @@ def create_booking(payload: BookingCreateRequest, current_user: User = Depends(g
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Seat numbers are invalid for this bus: {invalid_seats}",
+            )
+
+        seat_data = trip_seat_payload(db, trip)
+        seat_statuses = {seat["seat_number"]: seat["status"] for seat in seat_data["seats"]}
+        unavailable = [seat for seat in selected_seats if seat_statuses.get(seat) != "AVAILABLE"]
+        if unavailable:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"These seats are not available: {sorted(unavailable)}",
             )
 
         booked_seats = db.scalars(
@@ -144,6 +181,17 @@ def create_booking(payload: BookingCreateRequest, current_user: User = Depends(g
                 seat_number=seat_number,
             )
         )
+
+    db.add(
+        Payment(
+            booking_id=booking.id,
+            user_id=current_user.id,
+            amount=total_amount,
+            payment_method=payload.payment_method,
+            transaction_id=f"SIM-{uuid4().hex.upper()}",
+            payment_status="SUCCESS",
+        )
+    )
 
     try:
         db.commit()
@@ -211,6 +259,9 @@ def cancel_booking(
         )
 
     booking.status = "CANCELLED"
+
+    if booking.payment and booking.payment.payment_status == "SUCCESS":
+        booking.payment.payment_status = "REFUNDED"
 
     for seat in list(booking.seats):
         db.delete(seat)

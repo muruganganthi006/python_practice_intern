@@ -43,7 +43,7 @@ async def get_current_user(
         )
 
     user = db.scalar(select(User).where(User.id == int(user_id)))
-    if user is None:
+    if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
